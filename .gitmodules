@@ -1,0 +1,3 @@
+[submodule "lib/hde"]
+	path = lib/hde
+	url = https://github.com/System233/hde.git
