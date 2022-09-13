@@ -14,14 +14,17 @@
 
 #define MSGA_JMPBUF_SIZE 32
 
-#define MSGA_MP_NONE 0
-#define MSGA_MP_READ 1
-#define MSGA_MP_WRITE (1 << 1)
-#define MSGA_MP_EXEC (1 << 2)
-#define MSGA_MP_READWRITE_EXEC (MSGA_MP_READ | MSGA_MP_WRITE | MSGA_MP_EXEC)
-#define MSGA_MP_READWRITE (MSGA_MP_READ | MSGA_MP_WRITE)
-#define MSGA_MP_READ_EXEC (MSGA_MP_READ | MSGA_MP_EXEC)
-#define MSGA_MP_WRITE_EXEC (MSGA_MP_WRITE | MSGA_MP_EXEC)
+typedef enum 
+{
+    MSGA_MP_NONE = 0,
+    MSGA_MP_READ = 1,
+    MSGA_MP_WRITE = (1 << 1),
+    MSGA_MP_EXEC = (1 << 2),
+    MSGA_MP_READWRITE_EXEC = (MSGA_MP_READ | MSGA_MP_WRITE | MSGA_MP_EXEC),
+    MSGA_MP_READWRITE = (MSGA_MP_READ | MSGA_MP_WRITE),
+    MSGA_MP_READ_EXEC = (MSGA_MP_READ | MSGA_MP_EXEC),
+    MSGA_MP_WRITE_EXEC = (MSGA_MP_WRITE | MSGA_MP_EXEC)
+} MSGA_MP;
 
 typedef enum
 {
@@ -47,8 +50,8 @@ typedef enum
 typedef long long msga_addr_t;
 typedef unsigned long long msga_uaddr_t;
 
-typedef MSGA_ERR (*msga_mprotect_t)(msga_addr_t addr, int len, int port, void *user);
-typedef msga_addr_t (*msga_mmap_t)(msga_addr_t addr, int len, int port, void *user);
+typedef MSGA_ERR (*msga_mprotect_t)(msga_addr_t addr, int len, MSGA_MP prot, void *user);
+typedef msga_addr_t (*msga_mmap_t)(msga_addr_t addr, int len, MSGA_MP prot, void *user);
 typedef MSGA_ERR (*msga_munmap_t)(msga_addr_t addr, int len, void *user);
 typedef int (*msga_read_t)(msga_addr_t addr, void *data, int len, void *user);
 typedef int (*msga_write_t)(msga_addr_t addr, void const *data, int len, void *user);
@@ -83,8 +86,8 @@ _extern MSGA_ERR msga_hook_free(msga_hook_t *hook, int keep_hook);
 _extern MSGA_ERR msga_hook_init(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr);
 _extern MSGA_ERR msga_dohook(msga_hook_t *hook);
 _extern MSGA_ERR msga_unhook(msga_hook_t *hook);
-_extern MSGA_ERR msga_mprotect(msga_context_t *ctx, msga_addr_t addr, int len, int port);
-_extern msga_addr_t msga_mmap(msga_context_t *ctx, msga_addr_t addr, int len, int port);
+_extern MSGA_ERR msga_mprotect(msga_context_t *ctx, msga_addr_t addr, int len, MSGA_MP prot);
+_extern msga_addr_t msga_mmap(msga_context_t *ctx, msga_addr_t addr, int len, MSGA_MP prot);
 _extern MSGA_ERR msga_munmap(msga_context_t *ctx, msga_addr_t addr, int len);
 _extern int msga_read(msga_context_t *ctx, msga_addr_t addr, void *data, int len);
 _extern int msga_write(msga_context_t *ctx, msga_addr_t addr, void const *data, int len);

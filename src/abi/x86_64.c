@@ -13,12 +13,15 @@
 typedef int (*disasm_width_t)(void *code);
 
 #define JMP8_LEN 2
-#define JMP32_LEN 5
+#define JMP32R_LEN 5
+#define JMP32_LEN 10
 #define JMP64_LEN 14
 
-#define _JMP_LEN(off) ((off)-JMP8_LEN < (0x80LL) ? JMP8_LEN : (off)-JMP32_LEN < 0x80000000LL ? JMP32_LEN \
-                                                                      : JMP64_LEN)
-#define JMP_LEN(off) _JMP_LEN(off < 0 ? -off : off)
+#define _JMP_LEN(off, x64) ((off)-JMP8_LEN < (0x80LL) ? JMP8_LEN : (off)-JMP32R_LEN < 0x80000000LL ? JMP32R_LEN \
+                                                               : x64                               ? JMP64_LEN  \
+                                                                                                   : JMP32_LEN)
+
+#define JMP_LEN(off, x64) _JMP_LEN(off < 0 ? -off : off, x64)
 
 #define CH(off, index) ((((msga_uaddr_t)(off)) >> (index * 8)) & 0xFF)
 #define _JMP8(off) \
@@ -26,11 +29,18 @@ typedef int (*disasm_width_t)(void *code);
         0xEB, off  \
     }
 #define JMP8(off) _JMP8((off - 2))
-#define _JMP32(off)                                          \
+#define _JMP32R(off)                                         \
     {                                                        \
         0xE9, CH(off, 0), CH(off, 1), CH(off, 2), CH(off, 3) \
     }
-#define JMP32(off) _JMP32((off - 5))
+#define JMP32R(off) _JMP32R((off - 5))
+
+#define _JMP32(off, addr)                                               \
+    {                                                                   \
+        0xFF, 0x25, CH(addr, 0), CH(addr, 1), CH(addr, 2), CH(addr, 3), \
+            CH(off, 0), CH(off, 1), CH(off, 2), CH(off, 3)              \
+    }
+#define JMP32(off, addr) _JMP32(off, addr + 6)
 
 #define _JMP64(off)                                         \
     {                                                       \
@@ -40,20 +50,26 @@ typedef int (*disasm_width_t)(void *code);
     }
 #define JMP64(off) _JMP64(off)
 
-static int make_jmp(void *data, msga_addr_t from,msga_addr_t to)
+static int make_jmp(void *data, msga_addr_t from, msga_addr_t to, int x64)
 {
-    const msga_addr_t off=to-from;
-    const int len=JMP_LEN(to-from);
-    
+    const msga_addr_t off = to - from;
+    const int len = JMP_LEN(off, x64);
+
     if (len == JMP8_LEN)
     {
         unsigned char buf[] = JMP8(off);
         memcpy(data, buf, sizeof(buf));
         return MSGA_ERR_OK;
     }
+    else if (len == JMP32R_LEN)
+    {
+        unsigned char buf[] = JMP32R(off);
+        memcpy(data, buf, sizeof(buf));
+        return MSGA_ERR_OK;
+    }
     else if (len == JMP32_LEN)
     {
-        unsigned char buf[] = JMP32(off);
+        unsigned char buf[] = JMP32(to, from);
         memcpy(data, buf, sizeof(buf));
         return MSGA_ERR_OK;
     }
@@ -69,18 +85,19 @@ static int make_jmp(void *data, msga_addr_t from,msga_addr_t to)
 static MSGA_ERR _msga_hook_x86_64(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t origin_addr, int isx64)
 {
     msga_addr_t off_jmpto = hook->new_addr - hook->target_addr;
-    hook->jmp_len = JMP_LEN(off_jmpto);
+    hook->jmp_len = JMP_LEN(off_jmpto, isx64);
     int index = 0;
     unsigned char buffer[32];
-    memset(buffer,0,sizeof(buffer));
+    memset(buffer, 0, sizeof(buffer));
     do
     {
-        if(index > sizeof(buffer) / 2){
-            index=0;
+        if (index > sizeof(buffer) / 2)
+        {
+            index = 0;
         }
         if (!index)
         {
-            MSGA_TEST(msga_read(ctx, hook->target_addr + hook->backup_len, buffer, sizeof(buffer))==sizeof(buffer),MSGA_ERR_READ_LENGTH_MISMATCH);
+            MSGA_TEST(msga_read(ctx, hook->target_addr + hook->backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
         }
         int width = isx64 ? disasm_width64(buffer + index) : disasm_width32(buffer + index);
         if (width <= 0)
@@ -91,21 +108,21 @@ static MSGA_ERR _msga_hook_x86_64(msga_context_t *ctx, msga_hook_t *hook, msga_a
         index += width;
     } while (hook->backup_len < hook->jmp_len);
 
-    hook->jmp_len=hook->backup_len;
+    hook->jmp_len = hook->backup_len;
     MSGA_CHECK(msga_hook_alloc(hook));
 
     // JMPTO INST.
-    memset(hook->jmpbuf,0x90,hook->jmp_len);
-    MSGA_CHECK(make_jmp(hook->jmpbuf, hook->target_addr,hook->new_addr));
+    memset(hook->jmpbuf, 0x90, hook->jmp_len);
+    MSGA_CHECK(make_jmp(hook->jmpbuf, hook->target_addr, hook->new_addr, isx64));
 
     // ORIGIN INST.
     MSGA_TEST(msga_read(ctx, hook->target_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_BACKUP);
     MSGA_TEST(msga_write(ctx, hook->origin_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_WRITE_LENGTH_MISMATCH);
 
     // JMPBACK INST.
-    msga_addr_t off_jmpback = hook->origin_addr + hook->backup_len - hook->target_addr + hook->backup_len;
-    int jmpback_len = JMP_LEN(off_jmpback);
-    MSGA_CHECK(make_jmp(buffer, hook->origin_addr + hook->backup_len, hook->target_addr + hook->backup_len));
+    msga_addr_t off_jmpback = hook->target_addr - hook->origin_addr;
+    int jmpback_len = JMP_LEN(off_jmpback, isx64);
+    MSGA_CHECK(make_jmp(buffer, hook->origin_addr + hook->backup_len, hook->target_addr + hook->backup_len, isx64));
     MSGA_TEST(msga_write(ctx, hook->origin_addr + hook->backup_len, buffer, jmpback_len) == jmpback_len, MSGA_ERR_WRITE_LENGTH_MISMATCH);
 
     if (origin_addr)
@@ -117,12 +134,12 @@ static MSGA_ERR _msga_hook_x86_64(msga_context_t *ctx, msga_hook_t *hook, msga_a
 
 MSGA_ERR msga_hook_x86_64(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr, int isx64)
 {
-    memset(hook,0,sizeof(msga_hook_t));
+    memset(hook, 0, sizeof(msga_hook_t));
     hook->context = ctx;
     hook->new_addr = new_addr;
     hook->target_addr = target_addr;
 
-    MSGA_ERR err = _msga_hook_x86_64(ctx, hook, origin_addr,isx64);
+    MSGA_ERR err = _msga_hook_x86_64(ctx, hook, origin_addr, isx64);
     if (err != MSGA_ERR_OK)
     {
         msga_hook_free(hook, 0);

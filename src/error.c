@@ -34,6 +34,7 @@ char const *msga_error(MSGA_ERR err)
     }
     return "invalid errno";
 }
+#include <stdio.h>
 
 void msga_hook_debug(msga_hook_t *hook)
 {
@@ -41,16 +42,16 @@ void msga_hook_debug(msga_hook_t *hook)
 #define HDEBUGA(name, len)                  \
     do                                      \
     {                                       \
-        printf(#name"[%d]:", len); \
-        for (int i = 0; i < len; ++i)       \
+        printf(#name"[%d]=", len); \
+        for (int i = 0; i < len&&(name); ++i)       \
             printf("%02x,", name[i]);       \
         printf("\n");                       \
     } while (0)
     HDEBUG("%p", hook->context);
-    HDEBUG("%llx", hook->origin_addr);
+    HDEBUG("%#llx", hook->origin_addr);
     HDEBUG("%d", hook->origin_len);
-    HDEBUG("%llx", hook->new_addr);
-    HDEBUG("%llx", hook->target_addr);
+    HDEBUG("%#llx", hook->new_addr);
+    HDEBUG("%#llx", hook->target_addr);
     HDEBUGA(hook->backup, hook->backup_len);
     HDEBUGA(hook->jmpbuf, hook->jmp_len);
 }

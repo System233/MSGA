@@ -7,9 +7,9 @@
 #include "msga.h"
 
 #define MS_ERROR(X) (X != 0) ? -GetLastError() : 0;
-static int win_port(int port)
+static int win_prot(MSGA_MP prot)
 {
-    switch (port)
+    switch (prot)
     {
     case MSGA_MP_READWRITE_EXEC:
         return PAGE_EXECUTE_READWRITE;
@@ -43,17 +43,17 @@ static HANDLE win_handle(void *user)
     return GetCurrentProcess();
 }
 
-static msga_addr_t win_mmap(msga_addr_t addr, int len, int port, void *user)
+static msga_addr_t win_mmap(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
-    return (msga_addr_t)(VirtualAllocEx(win_handle(user), (void *)addr, len, MEM_COMMIT, win_port(port)));
+    return (msga_addr_t)(VirtualAllocEx(win_handle(user), (void *)addr, len, MEM_COMMIT, win_prot(prot)));
 }
 static MSGA_ERR win_munmap(msga_addr_t addr, int len, void *user)
 {
     return MS_ERROR(VirtualFreeEx(win_handle(user), (void *)addr, len, MEM_RELEASE));
 }
-static MSGA_ERR win_mprotect(msga_addr_t addr, int len, int port, void *user)
+static MSGA_ERR win_mprotect(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
-    return MS_ERROR(VirtualProtectEx(win_handle(user), (void *)addr, len, win_port(port), NULL));
+    return MS_ERROR(VirtualProtectEx(win_handle(user), (void *)addr, len, win_prot(prot), NULL));
 }
 static int win_read(msga_addr_t addr, void *data, int len, void *user)
 {

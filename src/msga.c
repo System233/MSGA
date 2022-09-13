@@ -87,15 +87,15 @@ MSGA_ERR msga_unhook(msga_hook_t *hook)
     MSGA_CHECK(msga_mprotect(hook->context, hook->target_addr, hook->jmp_len, MSGA_MP_READ_EXEC));
     return MSGA_ERR_OK;
 }
-MSGA_ERR msga_mprotect(msga_context_t *ctx, msga_addr_t addr, int len, int port)
+MSGA_ERR msga_mprotect(msga_context_t *ctx, msga_addr_t addr, int len, MSGA_MP prot)
 {
     MSGA_TEST(ctx->mprotect, MSGA_ERR_NOT_IMPLEMENTED);
-    return ctx->mprotect(addr, len, port, ctx->user);
+    return ctx->mprotect(addr, len, prot, ctx->user);
 }
-msga_addr_t msga_mmap(msga_context_t *ctx, msga_addr_t addr, int len, int port)
+msga_addr_t msga_mmap(msga_context_t *ctx, msga_addr_t addr, int len, MSGA_MP prot)
 {
     MSGA_TEST(ctx->mmap, 0);
-    return ctx->mmap(addr, len, port, ctx->user);
+    return ctx->mmap(addr, len, prot, ctx->user);
 }
 MSGA_ERR msga_munmap(msga_context_t *ctx, msga_addr_t addr, int len)
 {
