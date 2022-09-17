@@ -33,8 +33,8 @@ void testHook(){
     msga_context_t ctx;
     msga_hook_t hook;
     assert(msga_init(&ctx,0)==MSGA_ERR_OK);
-
-    assert(msga_hook_init(&ctx,&hook,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func)==MSGA_ERR_OK);
+    msga_hook_init(&hook,&ctx,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func);
+    assert(msga_hook_setup(&hook)==MSGA_ERR_OK);
 
     assert(add(10,20)==30);
 
@@ -50,14 +50,16 @@ void testNestHook(){
     msga_context_t ctx;
     msga_hook_t hook,hook2;
     assert(msga_init(&ctx,0)==MSGA_ERR_OK);
-    assert(msga_hook_init(&ctx,&hook,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func)==MSGA_ERR_OK);
+    msga_hook_init(&hook,&ctx,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func);
+    msga_hook_init(&hook2,&ctx,(msga_addr_t)add,(msga_addr_t)hook2_func,(msga_addr_t)&$hook2_func);
+    assert(msga_hook_setup(&hook)==MSGA_ERR_OK);
 
     assert(add(10,20)==30);
 
     assert(msga_dohook(&hook)==MSGA_ERR_OK);
     assert(add(10,20)==32);
     
-    assert(msga_hook_init(&ctx,&hook2,(msga_addr_t)add,(msga_addr_t)hook2_func,(msga_addr_t)&$hook2_func)==MSGA_ERR_OK);
+    assert(msga_hook_setup(&hook2)==MSGA_ERR_OK);
     assert(msga_dohook(&hook2)==MSGA_ERR_OK);
     assert(add(10,20)==36);
     
@@ -143,7 +145,8 @@ int main(int argc, char const *argv[])
     msga_context_t ctx;
     msga_hook_t hook;
     DBG(msga_init(&ctx,0));
-    DBG(msga_hook_init(&ctx,&hook,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func));
+    msga_hook_init(&hook,&ctx,(msga_addr_t)add,(msga_addr_t)hook_func,(msga_addr_t)&$hook_func);
+    assert(msga_hook_setup(&hook)==MSGA_ERR_OK);
     msga_hook_debug(&hook);
     printf("10+20=%d\n",add(10,20));
     DBG(msga_dohook(&hook));

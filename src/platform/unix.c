@@ -6,8 +6,9 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
-#include <errno.h>
 #include "msga.h"
+#include "../utils.h"
+
 static int unix_prot(MSGA_MP prot)
 {
     int p = PROT_NONE;
@@ -35,22 +36,25 @@ static void unix_align(msga_addr_t *addr, int *len)
 }
 static msga_addr_t unix_mmap(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
-    // unix_align(&addr, &len);
-    void *buf = mmap((void *)addr, len, unix_prot(prot), MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    void *buf = mmap((void *)addr, len, unix_prot(prot), MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (buf == MAP_FAILED)
     {
-        return -errno;
+        return 0;
     }
     return (msga_addr_t)buf;
 }
 static MSGA_ERR unix_munmap(msga_addr_t addr, int len, void *user)
 {
-    return munmap((void *)addr, len);
+    MSGA_ERROR_BEGIN;
+    MSGA_TEST(munmap((void *)addr, len) == 0, MSGA_ERR_SYSTEM);
+    MSGA_ERROR_END;
 }
 static MSGA_ERR unix_mprotect(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
+    MSGA_ERROR_BEGIN;
     unix_align(&addr, &len);
-    return mprotect((void *)addr, len, unix_prot(prot));
+    MSGA_TEST(mprotect((void *)addr, len, unix_prot(prot)) == 0, MSGA_ERR_SYSTEM);
+    MSGA_ERROR_END;
 }
 static int unix_read(msga_addr_t addr, void *data, int len, void *user)
 {

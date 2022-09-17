@@ -10,5 +10,5 @@
 
 int disasm_width32(void *code);
 int disasm_width64(void *code);
-MSGA_ERR msga_hook_x86_64(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr,int isx64);
+MSGA_ERR msga_hook_x86_64(msga_hook_t *hook, int isx64);
 #endif

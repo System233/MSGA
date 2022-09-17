@@ -10,6 +10,9 @@ set(MSGA_SRC
     src/abi/x86_64.c
     src/abi/amd64.c
     src/abi/x86.c
+    src/abi/thumb.c
+    src/abi/aarch32.c
+    src/abi/aarch64.c
 )
 add_library(msga SHARED ${MSGA_SRC})
 target_include_directories(msga PUBLIC include)

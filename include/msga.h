@@ -12,9 +12,10 @@
 #define _extern
 #endif
 
-#define MSGA_JMPBUF_SIZE 32
+#define MSGA_JMPBACK_SIZE 32
+#define MSGA_BUFFER_SIZE 64
 
-typedef enum 
+typedef enum
 {
     MSGA_MP_NONE = 0,
     MSGA_MP_READ = 1,
@@ -28,16 +29,20 @@ typedef enum
 
 typedef enum
 {
-    MSGA_ERR_OK,
-    MSGA_ERR_NOT_IMPLEMENTED,
+    MSGA_ERR_SYSTEM = -2,
+    MSGA_ERR_NOT_IMPLEMENTED = -1,
+    MSGA_ERR_OK = 0,
+    MSGA_ERR_INVALID_ARGUMENTS,
+    MSGA_ERR_INVALID_THUMB_ADDRESS,
     MSGA_ERR_MALLOC_FAIL,
-    MSGA_ERR_MMAP,
     MSGA_ERR_READ_LENGTH_MISMATCH,
     MSGA_ERR_WRITE_LENGTH_MISMATCH,
     MSGA_ERR_MEMORY_MISMATCH,
     MSGA_ERR_UNKNOWN_INSTRUCTION,
-    MSGA_ERR_BACKUP,
-    MSGA_ERR_BACKUP_SIZE,
+    MSGA_ERR_READ_BACKUP,
+    MSGA_ERR_WRITE_ORIGIN,
+    MSGA_ERR_READ_STUB,
+    MSGA_ERR_WRITE_STUB,
     MSGA_ERR_END
 } MSGA_ERR;
 
@@ -69,21 +74,23 @@ typedef struct
 typedef struct
 {
     msga_context_t *context;
-    int backup_len, origin_len, jmp_len, buf_len, cmp_len;
+    int backup_len, origin_len, jmpbuf_len, buf_len, cmpbuf_len;
     msga_addr_t target_addr;
     msga_addr_t new_addr;
+    msga_addr_t old_addr;
     msga_addr_t origin_addr;
-    unsigned char *buffer; // freeable,=backup_len+jmp_len+cmp_len;
+
+    unsigned char *buffer; // freeable,=backup_len+jmpbuf_len+cmpbuf_len;
     unsigned char *backup; // unfreeable
     unsigned char *jmpbuf; // unfreeable
     unsigned char *cmpbuf; // unfreeable
+    unsigned char _buffer[MSGA_BUFFER_SIZE];
 } msga_hook_t;
 
 _extern MSGA_ERR msga_init(msga_context_t *ctx, void *user);
-_extern MSGA_ERR msga_hook_alloc(msga_hook_t *hook);
-_extern void msga_hook_debug(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_alloc(msga_hook_t *hook, int backup_len, int jmpbuf_len, int jmpback_len);
 _extern MSGA_ERR msga_hook_free(msga_hook_t *hook, int keep_hook);
-_extern MSGA_ERR msga_hook_init(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr);
+_extern MSGA_ERR msga_hook_init(msga_hook_t *hook, msga_context_t *ctx, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t old_addr);
 _extern MSGA_ERR msga_dohook(msga_hook_t *hook);
 _extern MSGA_ERR msga_unhook(msga_hook_t *hook);
 _extern MSGA_ERR msga_mprotect(msga_context_t *ctx, msga_addr_t addr, int len, MSGA_MP prot);
@@ -92,9 +99,14 @@ _extern MSGA_ERR msga_munmap(msga_context_t *ctx, msga_addr_t addr, int len);
 _extern int msga_read(msga_context_t *ctx, msga_addr_t addr, void *data, int len);
 _extern int msga_write(msga_context_t *ctx, msga_addr_t addr, void const *data, int len);
 _extern char const *msga_error(MSGA_ERR err);
+_extern void msga_hook_debug(msga_hook_t *hook);
 
-_extern MSGA_ERR msga_hook_x86(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr);
-_extern MSGA_ERR msga_hook_x64(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr);
+_extern MSGA_ERR msga_hook_setup(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_setup_x86(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_setup_x64(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_setup_aarch32(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_setup_aarch64(msga_hook_t *hook);
+_extern MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook);
 
 // #ifdef __cplusplus
 

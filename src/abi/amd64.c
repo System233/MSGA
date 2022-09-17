@@ -5,8 +5,8 @@
  * https://opensource.org/licenses/MIT
  */
 
-#include "msga.h"
 #include <hde64.h>
+#include "msga.h"
 #include "x86_64.h"
 
 int disasm_width64(void *code)
@@ -20,7 +20,7 @@ int disasm_width64(void *code)
     return width;
 }
 
-MSGA_ERR msga_hook_x64(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr)
+MSGA_ERR msga_hook_setup_x64(msga_hook_t *hook)
 {
-    return msga_hook_x86_64(ctx, hook, target_addr, new_addr, origin_addr, 1);
+    return msga_hook_x86_64(hook, 1);
 }

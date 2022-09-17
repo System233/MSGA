@@ -5,8 +5,8 @@
 
 #include <windows.h>
 #include "msga.h"
+#include "../utils.h"
 
-#define MS_ERROR(X) (X != 0) ? -GetLastError() : 0;
 static int win_prot(MSGA_MP prot)
 {
     switch (prot)
@@ -49,21 +49,31 @@ static msga_addr_t win_mmap(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 }
 static MSGA_ERR win_munmap(msga_addr_t addr, int len, void *user)
 {
-    return MS_ERROR(VirtualFreeEx(win_handle(user), (void *)addr, len, MEM_RELEASE));
+    MSGA_ERROR_BEGIN;
+    MSGA_TEST(VirtualFreeEx(win_handle(user), (void *)addr, len, MEM_RELEASE) != 0, MSGA_ERR_SYSTEM);
+    MSGA_ERROR_END;
 }
 static MSGA_ERR win_mprotect(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
-    return MS_ERROR(VirtualProtectEx(win_handle(user), (void *)addr, len, win_prot(prot), NULL));
+    MSGA_ERROR_BEGIN;
+    MSGA_TEST(VirtualProtectEx(win_handle(user), (void *)addr, len, win_prot(prot), NULL) != FALSE, MSGA_ERR_SYSTEM);
+    MSGA_ERROR_END;
 }
 static int win_read(msga_addr_t addr, void *data, int len, void *user)
 {
+    MSGA_ERROR_BEGIN;
     SIZE_T size = 0;
-    return ReadProcessMemory(win_handle(user), (void *)addr, data, len, &size) != 0 ? size : 0;
+    MSGA_TEST(ReadProcessMemory(win_handle(user), (void *)addr, data, len, &size) != FALSE, MSGA_ERR_SYSTEM);
+    return size;
+    MSGA_ERROR_END;
 }
 static int win_write(msga_addr_t addr, void const *data, int len, void *user)
 {
+    MSGA_ERROR_BEGIN;
     SIZE_T size = 0;
-    return WriteProcessMemory(win_handle(user), (void *)addr, data, len, &size) != 0 ? size : 0;
+    MSGA_TEST(WriteProcessMemory(win_handle(user), (void *)addr, data, len, &size) != FALSE, MSGA_ERR_SYSTEM);
+    return size;
+    MSGA_ERROR_END;
 }
 
 #undef MS_ERROR

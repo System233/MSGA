@@ -18,7 +18,7 @@ int disasm_width32(void *code)
     return width;
 }
 
-MSGA_ERR msga_hook_x86(msga_context_t *ctx, msga_hook_t *hook, msga_addr_t target_addr, msga_addr_t new_addr, msga_addr_t origin_addr)
+MSGA_ERR msga_hook_setup_x86(msga_hook_t *hook)
 {
-    return msga_hook_x86_64(ctx, hook, target_addr, new_addr, origin_addr, 0);
+    return msga_hook_x86_64(hook, 0);
 }
