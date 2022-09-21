@@ -23,7 +23,6 @@ char const *msga_error(MSGA_ERR err)
         EK(MSGA_ERR_MEMORY_MISMATCH, "memory mismatch");
         EK(MSGA_ERR_UNKNOWN_INSTRUCTION, "unknown instruction");
         EK(MSGA_ERR_READ_BACKUP, "read backup fail");
-        EK(MSGA_ERR_WRITE_BACKUP, "write backup fail");
         EK(MSGA_ERR_INVALID_ARGUMENTS, "invalid arguments");
         EK(MSGA_ERR_SYSTEM,"system error");
     default:

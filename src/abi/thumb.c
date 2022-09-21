@@ -15,7 +15,7 @@
 #define MAKE_JMPBUF(addr) {0xDF, 0xF8, 0x00, 0xF0, LB4(addr)};
 
 #define ALIGN 4
-#define TEST_WIDTH(value) ((value)&0xF800 > 0xE000) ? 4 : 2
+#define TEST_WIDTH(value) (((value)&0xF800) > 0xE000) ? 4 : 2
 
 MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
 {
@@ -38,7 +38,7 @@ MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
         {
             MSGA_TEST(msga_read(hook->context, target_addr + backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
         }
-        int width = TEST_WIDTH(*(uint16_t *)&buffer[index]);
+        int width = TEST_WIDTH(*(unsigned short *)&buffer[index]);
         if (width <= 0)
         {
             return MSGA_ERR_UNKNOWN_INSTRUCTION;
@@ -51,7 +51,7 @@ MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
 
     msga_addr_t origin_addr = MSGA_ALIGN(hook->origin_addr, 4);
 
-    unsigned char nopbuf[0] = {0x00, 0xBF};
+    unsigned char nopbuf[] = {0x00, 0xBF};
     unsigned char jmpbuf[JMP_LEN] = MAKE_JMPBUF(hook->new_addr);
     unsigned char jmpback_buf[JMP_LEN] = MAKE_JMPBUF(hook->target_addr + hook->backup_len);
 

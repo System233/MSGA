@@ -50,13 +50,14 @@ static msga_addr_t win_mmap(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 static MSGA_ERR win_munmap(msga_addr_t addr, int len, void *user)
 {
     MSGA_ERROR_BEGIN;
-    MSGA_TEST(VirtualFreeEx(win_handle(user), (void *)addr, len, MEM_RELEASE) != 0, MSGA_ERR_SYSTEM);
+    MSGA_TEST(VirtualFreeEx(win_handle(user), (void *)addr, 0, MEM_RELEASE) != FALSE, MSGA_ERR_SYSTEM);
     MSGA_ERROR_END;
 }
 static MSGA_ERR win_mprotect(msga_addr_t addr, int len, MSGA_MP prot, void *user)
 {
     MSGA_ERROR_BEGIN;
-    MSGA_TEST(VirtualProtectEx(win_handle(user), (void *)addr, len, win_prot(prot), NULL) != FALSE, MSGA_ERR_SYSTEM);
+    DWORD oldProtect;
+    MSGA_TEST(VirtualProtectEx(win_handle(user), (void *)addr, len, win_prot(prot), &oldProtect) != FALSE, MSGA_ERR_SYSTEM);
     MSGA_ERROR_END;
 }
 static int win_read(msga_addr_t addr, void *data, int len, void *user)
