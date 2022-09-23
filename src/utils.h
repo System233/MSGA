@@ -44,7 +44,8 @@
     }
 
 #define CH(value, index) ((((msga_uaddr_t)(value)) >> (index * 8)) & 0xFF)
-#define LB4(value) CH(value,0),CH(value,1),CH(value,2),CH(value,3)
-#define LB8(value) LB4(value),LB4((value>>32))
+#define LB4(value) CH((value),0),CH((value),1),CH((value),2),CH((value),3)
+#define LB8(value) LB4(value),LB4(((value)>>32))
+
 
 #endif //_MSGA_UTILS_H
