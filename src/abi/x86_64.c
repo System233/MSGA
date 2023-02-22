@@ -82,7 +82,7 @@ static int make_jmp(void *data, msga_addr_t from, msga_addr_t to, int x64)
 static MSGA_ERR _msga_hook_x86_64(msga_hook_t *hook, int isx64)
 {
     MSGA_ERROR_BEGIN;
-    msga_addr_t off_jmpto = hook->new_addr - hook->target_addr;
+    msga_addr_t off_jmpto = hook->jmp_addr - hook->to_addr;
     int jmpbuf_len = JMP_LEN(off_jmpto, isx64);
     int backup_len = 0;
     int index = 0;
@@ -97,7 +97,7 @@ static MSGA_ERR _msga_hook_x86_64(msga_hook_t *hook, int isx64)
         }
         if (!index)
         {
-            MSGA_TEST(msga_read(hook->context, hook->target_addr + backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
+            MSGA_TEST(msga_read(hook->context, hook->to_addr + backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
         }
         int width = isx64 ? disasm_width64(buffer + index) : disasm_width32(buffer + index);
         if (width <= 0)
@@ -112,21 +112,21 @@ static MSGA_ERR _msga_hook_x86_64(msga_hook_t *hook, int isx64)
 
     // JMPTO INST.
     memset(hook->jmpbuf, 0x90, hook->jmpbuf_len);
-    MSGA_CHECK(make_jmp(hook->jmpbuf, hook->target_addr, hook->new_addr, isx64));
+    MSGA_CHECK(make_jmp(hook->jmpbuf, hook->to_addr, hook->jmp_addr, isx64));
 
     // ORIGIN INST.
-    MSGA_TEST(msga_read(hook->context, hook->target_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
+    MSGA_TEST(msga_read(hook->context, hook->to_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
     MSGA_TEST(msga_write(hook->context, hook->origin_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_WRITE_LENGTH_MISMATCH);
 
     // JMPBACK INST.
-    msga_addr_t off_jmpback = hook->target_addr - hook->origin_addr;
+    msga_addr_t off_jmpback = hook->to_addr - hook->origin_addr;
     int jmpback_len = JMP_LEN(off_jmpback, isx64);
-    MSGA_CHECK(make_jmp(buffer, hook->origin_addr + hook->backup_len, hook->target_addr + hook->backup_len, isx64));
+    MSGA_CHECK(make_jmp(buffer, hook->origin_addr + hook->backup_len, hook->to_addr + hook->backup_len, isx64));
     MSGA_TEST(msga_write(hook->context, hook->origin_addr + hook->backup_len, buffer, jmpback_len) == jmpback_len, MSGA_ERR_WRITE_LENGTH_MISMATCH);
 
-    if (hook->old_addr)
+    if (hook->from_addr)
     {
-        MSGA_TEST(msga_write(hook->context, hook->old_addr, &hook->origin_addr, isx64 ? 8 : 4) == (isx64 ? 8 : 4), MSGA_ERR_WRITE_LENGTH_MISMATCH);
+        MSGA_TEST(msga_write(hook->context, hook->from_addr, &hook->origin_addr, isx64 ? 8 : 4) == (isx64 ? 8 : 4), MSGA_ERR_WRITE_LENGTH_MISMATCH);
     }
     return MSGA_ERR_OK;
 

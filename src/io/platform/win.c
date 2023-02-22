@@ -5,7 +5,7 @@
 
 #include <windows.h>
 #include "msga.h"
-#include "../utils.h"
+#include "msga_utils.h"
 
 static int win_prot(MSGA_MP prot)
 {
@@ -76,11 +76,23 @@ static int win_write(msga_addr_t addr, void const *data, int len, void *user)
     return size;
     MSGA_ERROR_END;
 }
+static void win_done(msga_addr_t addr, void const *data, int len, void *user)
+{
+    CloseHandle(win_handle(user));
+}
+static void* win_open(int pid)
+{
+    if(pid<0){
+        return GetCurrentProceess();
+    }
+    return OpenProcess(PROCESS_ALL_ACCESS,TRUE,pid);
+}
 
 #undef MS_ERROR
-
+#define impl_open win_open
 #define impl_write win_write
 #define impl_read win_read
 #define impl_mprotect win_mprotect
 #define impl_munmap win_munmap
 #define impl_mmap win_mmap
+#define impl_done win_done

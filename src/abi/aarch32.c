@@ -17,15 +17,15 @@
 MSGA_ERR msga_hook_setup_aarch32(msga_hook_t *hook)
 {
     MSGA_ERROR_BEGIN;
-    if (hook->target_addr & 1)
+    if (hook->to_addr & 1)
     {
         return msga_hook_setup_thumb(hook);
     }
     MSGA_CHECK(msga_hook_alloc(hook, JMP_LEN, JMP_LEN, JMP_LEN));
-    unsigned char jmpbuf[JMP_LEN] = MAKE_JMPBUF(hook->new_addr);
-    unsigned char jmpback_buf[JMP_LEN] = MAKE_JMPBUF(hook->target_addr+hook->backup_len);
+    unsigned char jmpbuf[JMP_LEN] = MAKE_JMPBUF(hook->jmp_addr);
+    unsigned char jmpback_buf[JMP_LEN] = MAKE_JMPBUF(hook->to_addr+hook->backup_len);
     memcpy(hook->jmpbuf, jmpbuf, sizeof(jmpbuf));
-    MSGA_TEST(msga_read(hook->context, hook->target_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
+    MSGA_TEST(msga_read(hook->context, hook->to_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
     MSGA_TEST(msga_write(hook->context, hook->origin_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_WRITE_ORIGIN);
     MSGA_TEST(msga_write(hook->context, hook->origin_addr + hook->backup_len, jmpback_buf, sizeof(jmpback_buf)) == sizeof(jmpback_buf), MSGA_ERR_WRITE_ORIGIN);
     MSGA_ERROR_END;

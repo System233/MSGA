@@ -20,9 +20,9 @@
 MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
 {
     MSGA_ERROR_BEGIN;
-    msga_addr_t target_addr = hook->target_addr & ~1;
+    msga_addr_t to_addr = hook->to_addr & ~1;
 
-    int padding = MSGA_ALIGN(target_addr, 4) - target_addr;
+    int padding = MSGA_ALIGN(to_addr, 4) - to_addr;
     MSGA_TEST(padding == 0 || padding == 2, MSGA_ERR_INVALID_THUMB_ADDRESS);
 
     unsigned char buffer[32];
@@ -36,7 +36,7 @@ MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
         }
         if (!index)
         {
-            MSGA_TEST(msga_read(hook->context, target_addr + backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
+            MSGA_TEST(msga_read(hook->context, to_addr + backup_len, buffer, sizeof(buffer)) == sizeof(buffer), MSGA_ERR_READ_LENGTH_MISMATCH);
         }
         int width = TEST_WIDTH(*(unsigned short *)&buffer[index]);
         if (width <= 0)
@@ -52,13 +52,13 @@ MSGA_ERR msga_hook_setup_thumb(msga_hook_t *hook)
     msga_addr_t origin_addr = MSGA_ALIGN(hook->origin_addr, 4);
 
     unsigned char nopbuf[] = {0x00, 0xBF};
-    unsigned char jmpbuf[JMP_LEN] = MAKE_JMPBUF(hook->new_addr);
-    unsigned char jmpback_buf[JMP_LEN] = MAKE_JMPBUF(hook->target_addr + hook->backup_len);
+    unsigned char jmpbuf[JMP_LEN] = MAKE_JMPBUF(hook->jmp_addr);
+    unsigned char jmpback_buf[JMP_LEN] = MAKE_JMPBUF(hook->to_addr + hook->backup_len);
 
     memcpy(hook->jmpbuf, nopbuf, padding);
     memcpy(hook->jmpbuf + padding, jmpbuf, sizeof(jmpbuf));
 
-    MSGA_TEST(msga_read(hook->context, target_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
+    MSGA_TEST(msga_read(hook->context, to_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_READ_BACKUP);
     MSGA_TEST(msga_write(hook->context, hook->origin_addr, hook->backup, hook->backup_len) == hook->backup_len, MSGA_ERR_WRITE_ORIGIN);
     MSGA_TEST(msga_write(hook->context, hook->origin_addr + hook->backup_len, jmpback_buf, sizeof(jmpback_buf)) == sizeof(jmpback_buf), MSGA_ERR_WRITE_ORIGIN);
     MSGA_ERROR_END;

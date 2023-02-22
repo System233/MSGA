@@ -18,9 +18,8 @@ char const *msga_error(MSGA_ERR err)
         EK(MSGA_ERR_OK, "ok");
         EK(MSGA_ERR_MALLOC_FAIL, "malloc fail");
         EK(MSGA_ERR_NOT_IMPLEMENTED, "not implemented");
-        EK(MSGA_ERR_READ_LENGTH_MISMATCH, "read length mismatch");
-        EK(MSGA_ERR_WRITE_LENGTH_MISMATCH, "write length mismatch");
-        EK(MSGA_ERR_MEMORY_MISMATCH, "memory mismatch");
+        EK(MSGA_ERR_MEM_RW_FAIL, "read or write memory fail");
+        EK(MSGA_ERR_MEMORY_MISMATCH, "memory data mismatch");
         EK(MSGA_ERR_UNKNOWN_INSTRUCTION, "unknown instruction");
         EK(MSGA_ERR_READ_BACKUP, "read backup fail");
         EK(MSGA_ERR_INVALID_ARGUMENTS, "invalid arguments");
@@ -44,11 +43,11 @@ void msga_hook_debug(msga_hook_t *hook)
         printf("\n");                           \
     } while (0)
     HDEBUG("%p", hook->context);
-    HDEBUG("%#llx", hook->origin_addr);
-    HDEBUG("%d", hook->origin_len);
-    HDEBUG("%#llx", hook->new_addr);
-    HDEBUG("%#llx", hook->old_addr);
-    HDEBUG("%#llx", hook->target_addr);
-    HDEBUGA(hook->backup, hook->backup_len);
-    HDEBUGA(hook->jmpbuf, hook->jmpbuf_len);
+    // HDEBUG("%#llx", hook->origin_addr);
+    // HDEBUG("%d", hook->origin_len);
+    HDEBUG("%#llx", hook->jmp_addr);
+    HDEBUG("%#llx", hook->from_addr);
+    HDEBUG("%#llx", hook->to_addr);
+    // HDEBUGA(hook->backup, hook->backup_len);
+    // HDEBUGA(hook->jmpbuf, hook->jmpbuf_len);
 }

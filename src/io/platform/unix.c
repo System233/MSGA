@@ -4,10 +4,13 @@
 // https://opensource.org/licenses/MIT
 
 #include <unistd.h>
-#include <sys/mman.h>
+// #include <sys/uio.h>
+// #include <sys/mman.h>
+#include <sys/ptrace.h>
 #include <string.h>
+#include <stdlib.h>
 #include "msga.h"
-#include "../utils.h"
+#include "msga_utils.h"
 
 static int unix_prot(MSGA_MP prot)
 {
@@ -58,6 +61,7 @@ static MSGA_ERR unix_mprotect(msga_addr_t addr, int len, MSGA_MP prot, void *use
 }
 static int unix_read(msga_addr_t addr, void *data, int len, void *user)
 {
+    fseek(addr,SEEK_SET);
     memcpy(data, (void *)addr, len);
     return len;
 }
@@ -66,9 +70,21 @@ static int unix_write(msga_addr_t addr, void const *data, int len, void *user)
     memcpy((void *)addr, data, len);
     return len;
 }
+static void unix_done(msga_addr_t addr, void const *data, int len, void *user)
+{
+    fclose((FILE*)user);
+}
+static void* unix_open(int pid)
+{
+    ptrace()
+    
+    
+}
 
+#define impl_open unix_open
 #define impl_write unix_write
 #define impl_read unix_read
 #define impl_mprotect unix_mprotect
 #define impl_munmap unix_munmap
 #define impl_mmap unix_mmap
+#define impl_done unix_done
