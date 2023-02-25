@@ -1,0 +1,236 @@
+// Copyright (c) 2023 System233
+// 
+// This software is released under the MIT License.
+// https://opensource.org/licenses/MIT
+
+#include "msga/config.h"
+#include "msga/arch/x86_64.h"
+#include "msga/arch/x86.h"
+#include "msga/code.h"
+#include "ihde.h"
+
+#define ABS_JMP32_SIZE 5
+#define ABS_JMP64_SIZE 14
+#define ABS_JMPFAR_SIZE 6
+#include <stdio.h>
+
+namespace msga{
+    namespace x86_64{
+        bool operator==(int val,opcode op)
+        {
+            return (opcode)val==op;
+        }
+    }
+
+
+    namespace arch{
+        std::vector<uint8_t> x86_64::request(io::base&io,addr_t addr){
+            std::vector<uint8_t>data;
+            uint8_t buffer[MSGA_BUFFER_SIZE];
+            ihde hde(io.arch());
+            size_t abs_jmp_size=io.mode()==io::mode::x64?ABS_JMP64_SIZE:ABS_JMP32_SIZE;
+            size_t index=0,offset=0;
+            while(index<abs_jmp_size){
+                if(offset==0){
+                    io.read(&buffer,addr+index,MSGA_BUFFER_SIZE);
+                }
+                size_t width=hde.disasm(buffer+offset);
+                data.insert(data.end(),buffer+offset,buffer+offset+width);
+
+                index+=width;
+                offset+=width;
+            }
+        };
+
+        bool x86_64::generate(io::base&io,addr_t addr,std::vector<code>&generated,std::vector<code>&backup,addr_t origin){
+            ihde hde(io.arch());
+            uint8_t buffer[MSGA_BUFFER_SIZE];
+            size_t off_addr=0,offset=0;
+            size_t abs_jmp_size=io.mode()==io::mode::x64?ABS_JMP64_SIZE:ABS_JMP32_SIZE;
+            std::vector<std::pair<size_t,size_t>>record;
+            std::vector<std::pair<size_t,addr_t>>addr_table;
+            auto get_increase_size=[&record](size_t off){
+                size_t size=0;
+                for(auto it=record.rbegin();it!=record.rend();++it){
+                    size+=it->second;
+                    if(it->first==off){
+                        break;
+                    }
+                }
+                return size;
+            };
+            code co;
+            io.read(&buffer,addr,MSGA_BUFFER_SIZE);
+            while(off_addr<abs_jmp_size){
+                size_t width=hde.disasm(buffer+offset);
+                size_t last_size=co.size();
+                if(hde.opcode>=0x70&&hde.opcode<0x80||hde.opcode==msga::x86_64::opcode::JMP8){
+                    //JCC OFF8, JMP OFF8
+                    int8_t off8=hde.imm.imm8;
+                    addr_t jmpto=addr+off_addr+off8+width;
+                    if(jmpto<addr){
+                        // ABOVE ADDR
+                        if(io.mode()==io::mode::x64){
+                            if(hde.opcode==msga::x86_64::opcode::JMP8){
+                                msga::x86_64::JMPFAR jmpfar;
+                                jmpfar.offset=sizeof(jmpfar);
+                                co.write(jmpfar);
+                                addr_table.emplace_back(co.size()-4,jmpto);
+                            }else{
+                                msga::x86_64::JCC8 jcc8;
+                                jcc8.opcode=hde.opcode+(hde.opcode&0x1?-1:1);
+                                jcc8.offset=sizeof(msga::x86_64::JMPFAR)-sizeof(msga::x86_64::JCC8);
+                                co.write(jcc8);
+                                msga::x86_64::JMPFAR jmpfar;
+                                jmpfar.offset=sizeof(jmpfar);
+                                co.write(jmpfar);
+                                addr_table.emplace_back(co.size()-4,jmpto);
+                            }
+                        }else{
+                            if(hde.opcode==msga::x86_64::opcode::JMP8){
+                                msga::x86_64::JMP32 jmp32;
+                                jmp32.offset=jmpto-sizeof(jmp32);
+                                co.write(jmp32);
+                                co.setrel_imm(co.size()-4);
+                            }else{
+                                msga::x86_64::JCC32 jcc32;
+                                jcc32.opcode=0x0F;
+                                jcc32.opcode2=hde.opcode+0x10;
+                                jcc32.offset=jmpto-sizeof(jcc32);
+                                co.write(jcc32);
+                                co.setrel_imm(co.size()-4);
+                            }
+                        }
+                    }else if(jmpto-addr<off_addr){
+                        // IN ADDR~RIP
+                        size_t inc=get_increase_size(jmpto-addr);
+                        if(inc){
+                            msga::x86_64::JCC8 jcc8;
+                            jcc8.opcode=hde.opcode;
+                            jcc8.offset=off8-inc;
+                            co.write(jcc8);
+                        }else{
+                            co.write(&buffer[offset],width);
+                        }
+                    }else{
+                        //BELOW NOT FIX
+                        co.write(&buffer[offset],width);
+                    }
+                }if(hde.opcode==0x0F&&hde.opcode2>=0x80&&hde.opcode2<=0x70){
+                    // JCC OFF32
+                    int32_t off32=hde.imm.imm32;
+                    addr_t jmpto=addr+off_addr+off32+width;
+                    if(io.mode()==io::mode::x64){
+                        // JCC OFF8
+                        // JMP [RIP]
+                        // ADDR
+                        msga::x86_64::JCC8 jcc8;
+                        jcc8.opcode=hde.opcode2-0x10+(hde.opcode&0x1?-1:1);
+                        jcc8.offset=sizeof(msga::x86_64::JMPFAR)-sizeof(msga::x86_64::JCC8);;
+                        co.write(jcc8);
+                        msga::x86_64::JMPFAR jmpfar;
+                        jmpfar.offset=sizeof(jmpfar);
+                        co.write(jmpfar);
+                        addr_table.emplace_back(co.size()-4,jmpto);
+                    }else{
+                        // JCC OFF32
+                        msga::x86_64::JCC32 jcc32;
+                        jcc32.opcode=hde.opcode;
+                        jcc32.opcode2=hde.opcode2;
+                        jcc32.offset=jmpto-sizeof(jcc32);
+                        co.write(jcc32);
+                        co.setrel_imm(co.size()-4);
+                    }
+                }else if(hde.opcode==msga::x86_64::opcode::JMP32){
+                    // Fix JMP IMM32
+                    int32_t off32=hde.imm.imm32;
+                    addr_t jmpto=addr+off_addr+off32+width;
+                    if(io.mode()==io::mode::x64){
+                        msga::x86_64::JMPFAR jmpfar;
+                        jmpfar.offset=sizeof(jmpfar);
+                        co.write(jmpfar);
+                        addr_table.emplace_back(co.size()-4,jmpto);
+                    }else{
+                        msga::x86_64::JMP32 jmp32;
+                        jmp32.offset=jmpto-sizeof(jmp32);
+                        co.setrel_imm(co.size()-4);
+                    }
+                }else if(hde.opcode==msga::x86_64::opcode::JMPFAR&&hde.modrm==0x25){
+                    // Fix JMP [MEM]
+                    if(io.mode()==io::mode::x64){
+                        //JMP [RIP+OFF32]
+                        if(hde.disp.disp32==0){
+                            width+=8;
+                            co.write(&buffer[offset],width);
+                        }else{
+                            addr_t jmpto=int32_t(hde.disp.disp32)+addr+off_addr;
+                            msga::x86_64::JMPFAR jmpfar;
+                            jmpfar.offset=sizeof(jmpfar);
+                            co.write(jmpfar);
+                            addr_table.emplace_back(co.size()-4,jmpto);
+                        }
+                    }else{
+                        // JMP IMM32
+                        co.write(&buffer[offset],width);
+                    }
+                }else{
+                    if(io.mode()==io::mode::x64){
+                        if(hde.flags&ihde::flag::DISP32){
+                            // XXX REG,[DISP]
+                            // XXX [DISP],REG
+                            int32_t off=int32_t(hde.disp.disp32);
+                            addr_t target=addr+off_addr+off+width;
+                            uint32_t address=width;
+                            co.write(&buffer[offset],width-4-hde.imm_byte());
+                            co.write(address);
+                            
+                            addr_table.emplace_back(co.size()-4,target);
+                        }else if(hde.opcode==msga::x86_64::opcode::JMP32){
+                            int32_t off=int32_t(hde.imm.imm32);
+                            addr_t target=addr+off_addr+off+width;
+                            msga::x86_64::JMPFAR jmpfar;
+                            jmpfar.offset=width;
+                            co.write(jmpfar);
+                            addr_table.emplace_back(co.size()-4,target);
+                        }else if(hde.opcode==msga::x86_64::opcode::CALL32){
+                            int32_t off=int32_t(hde.imm.imm32);
+                            addr_t target=addr+off_addr+off+width;
+                            msga::x86_64::CALLFAR callfar;
+                            callfar.offset=width;
+                            co.write(callfar);
+                            addr_table.emplace_back(co.size()-4,target);
+                        }else{
+                            co.write(&buffer[offset],width);
+                        }
+                    }else{
+                        co.write(&buffer[offset],width);
+                    }
+                }
+                record.emplace_back(off_addr,co.size()-last_size);
+                off_addr+=width;
+                offset+=width;
+                if(offset>(MSGA_BUFFER_SIZE>>1)){
+                    io.read(&buffer,addr+off_addr,MSGA_BUFFER_SIZE);
+                    offset=0;
+                }
+            }
+            co.data.resize(aligned(co.size(),static_cast<int>(io.mode())));
+            // size_t index=0;
+            for(auto&item:addr_table){
+                uint32_t &data=co.get<uint32_t>(item.first);
+                size_t from_addr=item.first-data+sizeof(uint32_t);
+                size_t to_addr=co.size();//+index*sizeof(item.second);
+                data=to_addr-from_addr-data;
+                co.setrel(co.size());
+                co.write(item.second);
+                // index++;
+            }
+            code bak(addr,off_addr);
+            io.read(bak);
+            backup.push_back(bak);
+            generated.push_back(co);
+            return true;
+        };
+
+    };
+}

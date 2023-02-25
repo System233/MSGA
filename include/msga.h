@@ -1,13 +1,12 @@
-// Copyright (c) 2022 System233
-//
-// This software is released under the MIT License.
-// https://opensource.org/licenses/MIT
+/**
+ * Copyright (c) 2023 System233
+ * 
+ * This software is released under the MIT License.
+ * https://opensource.org/licenses/MIT
+ */
+#pragma once
 
-#ifndef _MSGA_H
-#define _MSGA_H
+#include <cstdint>
+#include <vector>
+#include "types.h"
 
-#include "msga_type.h"
-#include "msga_io.h"
-#include "msga_hook.h"
-
-#endif //_MSGA_H
