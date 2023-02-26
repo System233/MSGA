@@ -36,6 +36,7 @@ namespace msga{
         
     public:
         code(addr_t base=0,size_t size=0):m_base(base),m_data(size,0){}
+        void moveto(addr_t new_base){m_base=new_base;}
         size_t size()const{return m_data.size();}
         uint8_t const*get()const{return m_data.data();}
         uint8_t*get(){return m_data.data();}
@@ -53,6 +54,9 @@ namespace msga{
             m_addr_table.emplace_back(offset);
         }
         auto const&getaddr()const{
+            return m_addr_table;
+        }
+        auto&getaddr(){
             return m_addr_table;
         }
         void setbase(addr_t new_base){

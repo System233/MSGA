@@ -16,5 +16,13 @@ namespace msga{
     constexpr T aligned(T value,size_t alignto){
         return (value+alignto-1)&~(alignto-1);
     }
+    template<class T>
+    constexpr T ceil(T value,size_t alignto){
+        return (value+alignto-1)&~(alignto-1);
+    }
+    template<class T>
+    constexpr T floor(T value,size_t alignto){
+        return (value)&~(alignto-1);
+    }
     
 }

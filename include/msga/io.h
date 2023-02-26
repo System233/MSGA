@@ -10,6 +10,7 @@
 namespace msga{
     namespace io{
         enum class mode{
+            unknown=0,
             x32=4,
             x64=8,
         };
@@ -20,16 +21,21 @@ namespace msga{
             virtual void read(void*data,addr_t addr,size_t len)=0;
             virtual void write(void const*data, addr_t addr,size_t len)=0;
             virtual void rebase(addr_t addr,size_t len){};
-
-            virtual addr_t alloc(size_t size,addr_t perfer=0)=0;
+            virtual void debase(addr_t addr){};
+            virtual void search_rebase(std::vector<size_t>&items,addr_t addr,size_t len){};
+            virtual void range_rebase(std::vector<size_t>const&items,addr_t addr,size_t len){
+                for(auto item:items){
+                    rebase(addr+item,static_cast<size_t>(this->arch()));
+                }
+            };
+            virtual addr_t alloc(size_t size,addr_t preferred=0)=0;
             virtual void free(addr_t addr)=0;
             virtual void read(msga::code&co){
+                search_rebase(co.getaddr(),co.base(),co.size());
                 read(co.get(),co.base(),co.size());
             }
             virtual void write(msga::code const&co){
-                for(size_t off:co.getaddr()){
-                    rebase(co.base()+off,static_cast<size_t>(this->arch()));
-                }
+                range_rebase(co.getaddr(),co.base(),co.size());
                 write(co.get(),co.base(),co.size());
             }
             
@@ -49,5 +55,8 @@ namespace msga{
                 write(&data,addr,sizeof(T));
             }
         };
+        
+        void* allocate(uint8_t*data,size_t size,size_t request,size_t align);
+        void deallocate(void* addr);
     }
 }

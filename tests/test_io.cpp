@@ -38,9 +38,9 @@ public:
             VirtualProtect((void*)addr,len,oldProtect,&oldProtect);
 
         }
-        virtual addr_t alloc(size_t size,addr_t perfer=0)override{
+        virtual addr_t alloc(size_t size,addr_t preferred=0)override{
             // malloc(size);
-            addr_t base=aligned(perfer,0x1000);
+            addr_t base=aligned(preferred,0x1000);
             for(auto i=0;i<2000;++i){
                 auto addr=(addr_t)VirtualAlloc((LPVOID)(base+i*0x1000),size,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE);
                 if(addr){

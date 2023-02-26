@@ -11,9 +11,10 @@ bool msga::manager::dohook(hook_t&hook){
     }
     hook.code.setbase(hook.co_addr);
     hook.code_ptr.setbase(-hook.co_addr);
+    hook.code_ptr.moveto(hook.origin_addr);
     io().write(hook.code);
     io().write(hook.origin);
-    io().write(hook.code_ptr.get(),hook.origin_addr, hook.code_ptr.size());
+    io().write(hook.code_ptr);
     return true;
 }
 bool msga::manager::unhook(hook_t&hook){

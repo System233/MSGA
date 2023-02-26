@@ -4,7 +4,8 @@
  * This software is released under the MIT License.
  * https://opensource.org/licenses/MIT
  */
-
+#include <windows.h>
+IMAGE_SCN_ALIGN_1024BYTES
 #include "io/pe.h"
 #include <stdio.h>
 int main(int argc, char const *argv[])

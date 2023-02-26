@@ -5,7 +5,6 @@
 
 #include "msga/config.h"
 #include "msga/arch/x86_64.h"
-#include "msga/arch/x86.h"
 #include "msga/code.h"
 #include "ihde.h"
 
@@ -209,6 +208,7 @@ namespace msga{
             }
             //ORIG CALL
             co_ptr.setbase(0);
+            co_ptr.setaddr(0);
             if(io::mode::x64==io.arch()){
                 co_ptr.rebase<uint64_t>(0);
                 co_ptr.write<uint64_t>(0);
