@@ -31,9 +31,8 @@ namespace msga{
                 msga::x86_64::JMPFAR jmp;
                 jmp.offset=0;
                 co.write(jmp);
-                co.setaddr(co.size());
-                co.write(to);
-
+                co.write<uint64_t>(+to);
+                co.setaddr(co.size()-sizeof(uint64_t),e_rel::e_rela);
             }else{
                 msga::x86_64::JMP32 jmp;
                 jmp.offset=to-from-co.size()-sizeof(jmp);
@@ -159,7 +158,7 @@ namespace msga{
             }
             {
                 //JMP BACK
-                if(io::mode::x64==io.arch()){
+                if(io::mode::x64==io.arch()&&io::mode::x64==io.mode()){
                     msga::x86_64::JMPFAR jmp;
                     jmp.offset=sizeof(jmp);
                     co.write(jmp);
@@ -187,11 +186,12 @@ namespace msga{
                 size_t from_addr=item.first+sizeof(uint32_t);
                 size_t to_addr=co.size();
                 co.set<uint32_t>(item.first,to_addr-from_addr);
-                co.setaddr(co.size());
                 if(io.arch()==io::mode::x64){
-                    co.write(item.second);
+                    co.write<uint64_t>((uint64_t)item.second);
+                    co.setaddr(co.size()-sizeof(uint64_t),e_rel::e_rela);
                 }else{
                     co.write<uint32_t>(item.second);
+                    co.setaddr(co.size()-sizeof(uint32_t),e_rel::e_rela);
                 }
             }
             
@@ -203,19 +203,20 @@ namespace msga{
             if(to){
                 //JMP TO
                 origin.setbase(addr);
-                make_jmp(io.arch(),origin,addr,to);
+                make_jmp(io.mode(),origin,addr,to);
                 origin.resize(off_addr);
             }
             //ORIG CALL
             co_ptr.setbase(0);
-            co_ptr.setaddr(0);
             if(io::mode::x64==io.arch()){
-                co_ptr.rebase<uint64_t>(0);
                 co_ptr.write<uint64_t>(0);
+                co_ptr.rebase<uint64_t>(0);
             }else{
-                co_ptr.rebase<uint32_t>(0);
                 co_ptr.write<uint32_t>(0);
+                co_ptr.rebase<uint32_t>(0);
             }
+            co_ptr.setaddr(0,e_rel::e_rela);
+            
             return true;
         };
 

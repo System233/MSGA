@@ -14,29 +14,31 @@ namespace msga{
             x32=4,
             x64=8,
         };
+        
+
         class base{
             public:
             virtual mode arch()const=0;
             virtual mode mode()const=0;
             virtual void read(void*data,addr_t addr,size_t len)=0;
             virtual void write(void const*data, addr_t addr,size_t len)=0;
-            virtual void rebase(addr_t addr,size_t len){};
+            virtual void rebase(addr_t addr,rel_base_t*opt){};
             virtual void debase(addr_t addr){};
-            virtual void search_rebase(std::vector<size_t>&items,addr_t addr,size_t len){};
-            virtual void range_rebase(std::vector<size_t>const&items,addr_t addr,size_t len){
-                for(auto item:items){
-                    rebase(addr+item,static_cast<size_t>(this->arch()));
+            virtual void search_rebase(rel_list_t&items,addr_t addr,size_t len){};
+            virtual void range_rebase(rel_list_t const&items,addr_t addr,size_t len){
+                for(auto&item:items){
+                    rebase(addr,item.get());
                 }
             };
-            virtual addr_t alloc(size_t size,addr_t preferred=0)=0;
-            virtual void free(addr_t addr)=0;
+            virtual addr_t alloc(size_t len,addr_t preferred=0)=0;
+            virtual void free(addr_t addr,size_t len)=0;
             virtual void read(msga::code&co){
                 search_rebase(co.getaddr(),co.base(),co.size());
                 read(co.get(),co.base(),co.size());
             }
             virtual void write(msga::code const&co){
-                range_rebase(co.getaddr(),co.base(),co.size());
                 write(co.get(),co.base(),co.size());
+                range_rebase(co.getaddr(),co.base(),co.size());
             }
             
 

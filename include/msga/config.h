@@ -6,3 +6,4 @@
 
 #define MSGA_BUFFER_SIZE 32
 #define MSGA_SECTION_NAME ".msga"
+#define MSGA_REL_SECTION_NAME ".rela.msga"

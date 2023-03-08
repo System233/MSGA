@@ -12,7 +12,6 @@
 #include <cstdio>
 #include <vector>
 #include "msga/io/pe.h"
-#include <memoryapi.h>
 #include "msga/manager.h"
 #include <fstream>
 using namespace msga::io;
@@ -38,7 +37,7 @@ int main(int argc, char const *argv[])
     msga::manager man(arch,io);
     printf("[test!pe]\n");
     
-    man.dohook(io.RVA2VA(0x15b0),io.RVA2VA(0x16a0),io.RVA2VA(0xd044));
+    man.dohook(io.RVA2VA(0x1470),io.RVA2VA(0x1560),io.RVA2VA(0x5110));
 
     io.debug();
     

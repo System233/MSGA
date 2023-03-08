@@ -8,6 +8,8 @@
 #include <list>
 #include <istream>
 #include <string>
+#include <map>
+#include <cstdint>
 
 #define IMAGE_FILE_MACHINE_UNKNOWN 0
 #define IMAGE_FILE_MACHINE_I386 0x014c
@@ -85,12 +87,12 @@ namespace msga
 {
     namespace pe
     {
-        using BYTE = unsigned char;
-        using WORD = unsigned short;
-        using SHORT = short;
-        using DWORD = unsigned int;
-        using LONG = long;
-        using ULONGLONG = unsigned long long;
+        using BYTE = uint8_t;
+        using WORD = uint16_t;
+        using SHORT = int16_t;
+        using DWORD = uint32_t;
+        using LONG = int32_t;
+        using ULONGLONG = uint64_t;
 
         struct IMAGE_DOS_HEADER
         {
@@ -306,6 +308,7 @@ namespace msga
         {
 
         public:
+            using rel_pe_t=rel_sys_t<uint8_t>;
             struct section_t
             {
                 IMAGE_SECTION_HEADER meta{0};
@@ -375,7 +378,7 @@ namespace msga
 
             void load_relocation_table();
             void rebuild_relocation_table();
-            size_t reserved(size_t perferred, size_t len);
+            addr_t reserved(addr_t perferred, size_t len);
 
         public:
             virtual io::mode arch() const override
@@ -394,28 +397,28 @@ namespace msga
             virtual io::mode mode() const override { return io::mode::x32; };
             virtual void read(void *data, addr_t addr, size_t len) override;
             virtual void write(void const *data, addr_t addr, size_t len) override;
-            virtual void search_rebase(std::vector<size_t> &items, addr_t addr, size_t len) override;
-            virtual void range_rebase(std::vector<size_t> const &items, addr_t addr, size_t len) override;
-            virtual void rebase(addr_t addr, size_t len) override;
+            virtual void search_rebase(rel_list_t &items, addr_t addr, size_t len) override;
+            virtual void range_rebase(rel_list_t const &items, addr_t addr, size_t len) override;
+            virtual void rebase(addr_t addr, rel_base_t*opt) override;
             virtual void debase(addr_t addr) override;
-            virtual addr_t alloc(size_t size, addr_t preferred = 0) override;
-            virtual void free(addr_t addr) override;
+            virtual addr_t alloc(size_t len, addr_t preferred = 0) override;
+            virtual void free(addr_t addr,size_t len) override;
             virtual bool load(std::istream &is);
             virtual bool load(std::string const&path);
             virtual bool dump(std::ostream &os);
             virtual bool dump(std::string const&path);
             virtual section_t &section(size_t rva);
             IMAGE_DATA_DIRECTORY &directory(int entry);
-            void*get(size_t rva);
+            void*get(addr_t va);
             template <class T>
-            T &get(size_t rva)
+            T &get(addr_t va)
             {
-                return *reinterpret_cast<T*>(get(rva));
+                return *reinterpret_cast<T*>(get(va));
             }
             template <class T>
-            void set(size_t rva, T const &&data)
+            void set(size_t va, T const &&data)
             {
-                auto &ref = get<T>(rva);
+                auto &ref = get<T>(va);
                 ref = data;
             };
             uint64_t option(e_option opt) const

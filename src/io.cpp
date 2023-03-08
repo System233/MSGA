@@ -38,6 +38,9 @@ namespace msga
                     }
                     cur_size += next_size;
                 }
+                if(cur_size<request){
+                    throw std::runtime_error("io alloc fail");
+                }
                 auto addr = &data[offset + sizeof(uint32_t)];
                 auto next_size = cur_size - request;
                 *reinterpret_cast<uint32_t *>(data + offset + request) = next_size;

@@ -4,56 +4,16 @@
  * This software is released under the MIT License.
  * https://opensource.org/licenses/MIT
  */
-
-#include "msga/io/pe.h"
-#include "msga/config.h"
-// #include "msga_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fstream>
-#define PAGE_SIZE 0x1000
-template <class T>
-struct raw
-{
-    T &data;
-    raw(T &data) : data(data) {}
-};
 
-template <class T>
-std::istream &operator>>(std::istream &is, raw<T> &&data)
-{
-    return is.read(reinterpret_cast<char *>(&data.data), sizeof(T));
-}
-template <class T>
-std::ostream &operator<<(std::ostream &is, raw<T> &&data)
-{
-    return is.write(reinterpret_cast<char *>(&data.data), sizeof(T));
-}
+#include "msga/io/pe.h"
+#include "msga/config.h"
+#include "helper.h"
 
-template <class T>
-std::istream &operator>>(std::istream &is, T &data)
-{
-    static_assert(std::is_trivially_copyable<T>::value, "T is not trivially copyable");
-    return is.read(reinterpret_cast<char *>(&data), sizeof(T));
-}
-template <class T>
-std::ostream &operator<<(std::ostream &is, T &data)
-{
-    static_assert(std::is_trivially_copyable<T>::value, "T is not trivially copyable");
-    return is.write(reinterpret_cast<char *>(&data), sizeof(T));
-}
-
-template <class T>
-std::istream &operator>>(std::istream &is, std::vector<T> &data)
-{
-    return is.read(reinterpret_cast<char *>(data.data()), sizeof(T) * data.size());
-}
-template <class T>
-std::ostream &operator<<(std::ostream &os, std::vector<T> &data)
-{
-    return os.write(reinterpret_cast<char *>(data.data()), sizeof(T) * data.size());
-}
+#define RELOC_PAGE_SIZE 0x1000
 std::istream &operator>>(std::istream &is, msga::io::pe::section_t &section)
 {
     is >> section.meta;
@@ -66,6 +26,7 @@ std::istream &operator>>(std::istream &is, msga::io::pe::section_t &section)
 }
 bool msga::io::pe::load(std::istream &is)
 {
+    is.seekg(std::ios::beg);
     is >> m_dos_h;
     if (m_dos_h.e_magic != 0x5A4D)
     {
@@ -112,7 +73,7 @@ void msga::io::pe::load_relocation_table()
 {
     auto &dir = directory(IMAGE_DIRECTORY_ENTRY_BASERELOC);
     size_t offset = 0;
-    auto base = &get<uint8_t>(dir.VirtualAddress);
+    auto base = &get<uint8_t>(RVA2VA(dir.VirtualAddress));
     while (offset < dir.Size)
     {
         auto &rel = *reinterpret_cast<IMAGE_BASE_RELOCATION *>(base + offset);
@@ -142,12 +103,7 @@ msga::io::pe::section_t &msga::io::pe::section(size_t rva)
     }
     throw std::runtime_error("RVA out of range");
 }
-template <class T>
-std::vector<uint8_t> &operator<<(std::vector<uint8_t> &data, T &&value)
-{
-    data.insert(data.end(), reinterpret_cast<uint8_t *>(&value), reinterpret_cast<uint8_t *>(&value) + sizeof(T));
-    return data;
-}
+
 void msga::io::pe::rebuild_relocation_table()
 {
     section_t section;
@@ -421,10 +377,10 @@ void msga::io::pe::option32(e_option opt, uint64_t value)
 #undef CASE
 }
 
-size_t msga::io::pe::reserved(size_t preferred, size_t len)
+msga::addr_t msga::io::pe::reserved(addr_t preferred, size_t len)
 {
     len = aligned(len, option(e_option::FileAlignment));
-    std::map<size_t, size_t> map;
+    std::map<addr_t, size_t> map;
     for (auto &section : m_sections)
     {
         map.emplace(section.addr(), section.size());
@@ -434,12 +390,12 @@ size_t msga::io::pe::reserved(size_t preferred, size_t len)
     {
         preferred = option(e_option::SectionAlignment);
     }
-    size_t last_end = 0;
-    size_t best_dist = preferred - last_end;
-    size_t best_end = last_end;
+    addr_t last_end = 0;
+    addr_t best_dist = preferred - last_end;
+    addr_t best_end = last_end;
     for (auto &item : map)
     {
-        size_t cur_end = item.first + item.second;
+        addr_t cur_end = item.first + item.second;
         if (cur_end - last_end < len)
         {
             continue;
@@ -491,37 +447,41 @@ msga::addr_t msga::io::pe::alloc(size_t size, addr_t preferred)
     m_sections.emplace_back(std::move(section));
     return RVA2VA(rva);
 }
-void msga::io::pe::free(addr_t addr)
+void msga::io::pe::free(addr_t addr,size_t len)
 {
-    auto rva = VA2RVA(addr);
-    deallocate((void *)&get<uint8_t>(rva));
+    deallocate((void *)&get<uint8_t>(addr));
 }
-void msga::io::pe::rebase(addr_t addr, size_t len)
+void msga::io::pe::rebase(addr_t addr, rel_base_t*opt)
 {
-    addr = VA2RVA(addr);
-    auto base = floor(addr, PAGE_SIZE);
+    addr = VA2RVA(addr+opt->offset());
+    auto base = floor(addr, RELOC_PAGE_SIZE);
     auto offset = addr - base;
-    auto type = 0;
-    switch (len)
+    auto type=0;
+    switch (opt->type())
     {
-    case 2:
+    case e_rel::e_rela:
+        type = arch()==io::mode::x64?IMAGE_REL_BASED_DIR64:IMAGE_REL_BASED_HIGHLOW;
+        break;
+    case e_rel::e_rel16:
         type = IMAGE_REL_BASED_LOW;
         break;
-    case 4:
+    case e_rel::e_rel32:
         type = IMAGE_REL_BASED_HIGHLOW;
         break;
-    case 8:
+    case e_rel::e_rel64:
         type = IMAGE_REL_BASED_DIR64;
         break;
+    case e_rel::e_rel_sys:
+        type = dynamic_cast<rel_pe_t*>(opt)->data();
     default:
-        throw std::runtime_error("bad rebase len");
+        throw std::runtime_error("bad e_rel type");
     }
     m_rel_table[base][offset] = type;
 }
 void msga::io::pe::debase(addr_t addr)
 {
     addr = VA2RVA(addr);
-    auto base = floor(addr, PAGE_SIZE);
+    auto base = floor(addr, RELOC_PAGE_SIZE);
     auto offset = addr - base;
     if (m_rel_table.count(base))
     {
@@ -533,12 +493,12 @@ void msga::io::pe::debase(addr_t addr)
         }
     }
 }
-void msga::io::pe::search_rebase(std::vector<size_t> &item, addr_t addr, size_t len)
+void msga::io::pe::search_rebase(rel_list_t &item, addr_t addr, size_t len)
 {
-    addr = VA2RVA(addr);
-    auto base = floor(addr, PAGE_SIZE);
-    auto end = addr + len;
-    for (auto i = 0; i < len; i += PAGE_SIZE)
+    auto rva = VA2RVA(addr);
+    auto base = floor(rva, RELOC_PAGE_SIZE);
+    auto end = rva + len;
+    for (auto i = 0; i < len; i += RELOC_PAGE_SIZE)
     {
         auto cur_base = base + i;
         if (m_rel_table.count(cur_base))
@@ -547,21 +507,21 @@ void msga::io::pe::search_rebase(std::vector<size_t> &item, addr_t addr, size_t 
             for (auto &blk : block)
             {
                 auto cur_addr = cur_base + blk.first;
-                if (cur_addr >= addr && cur_addr < end)
+                if (cur_addr >= rva && cur_addr < end)
                 {
-                    item.emplace_back(cur_addr - addr);
+                    item.emplace_back(std::make_unique<rel_pe_t>(cur_addr - rva,blk.second));
                 }
             }
         }
     }
 }
 
-void msga::io::pe::range_rebase(std::vector<size_t> const &items, addr_t addr, size_t len)
+void msga::io::pe::range_rebase(rel_list_t const &items, addr_t addr, size_t len)
 {
-    addr = VA2RVA(addr);
-    auto base = floor(addr, PAGE_SIZE);
-    auto end = addr + len;
-    for (auto i = 0; i < len; i += PAGE_SIZE)
+    auto rva = VA2RVA(addr);
+    auto base = floor(rva, RELOC_PAGE_SIZE);
+    auto end = rva + len;
+    for (auto i = 0; i < len; i += RELOC_PAGE_SIZE)
     {
         auto cur_base = base + i;
         if (m_rel_table.count(cur_base))
@@ -571,7 +531,7 @@ void msga::io::pe::range_rebase(std::vector<size_t> const &items, addr_t addr, s
             while (it != block.end())
             {
                 auto cur_addr = cur_base + it->first;
-                if (cur_addr >= addr && cur_addr < end)
+                if (cur_addr >= rva && cur_addr < end)
                 {
                     it = block.erase(it);
                 }
@@ -586,19 +546,17 @@ void msga::io::pe::range_rebase(std::vector<size_t> const &items, addr_t addr, s
             }
         }
     }
-    for (auto item : items)
+    for (auto&item : items)
     {
-        rebase(RVA2VA(addr) + item, static_cast<size_t>(arch()));
+        rebase(addr,item.get());
     }
 }
 void msga::io::pe::read(void *data, addr_t addr, size_t len)
 {
-    addr = VA2RVA(addr);
     memcpy(data, &get<uint8_t>(addr), len);
 }
 void msga::io::pe::write(void const *data, addr_t addr, size_t len)
 {
-    addr = VA2RVA(addr);
     memcpy(&get<uint8_t>(addr), data, len);
 }
 
@@ -626,8 +584,9 @@ void msga::io::pe::section_t::name(char const *name)
     memset(meta.Name, 0, sizeof(meta.Name));
     memcpy(meta.Name, name, std::min(sizeof(meta.Name), strnlen(name, sizeof(sizeof(meta.Name)))));
 }
-void *msga::io::pe::get(size_t rva)
+void *msga::io::pe::get(addr_t va)
 {
+    auto rva=VA2RVA(va);
     for (auto &section : m_sections)
     {
         auto base = section.meta.VirtualAddress;
@@ -641,7 +600,7 @@ void *msga::io::pe::get(size_t rva)
             return &section.data[rva - base];
         }
     }
-    throw std::runtime_error("RVA out of range");
+    throw std::runtime_error("address out of range");
 }
 msga::pe::IMAGE_DATA_DIRECTORY &msga::io::pe::directory(int entry)
 {

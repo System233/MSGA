@@ -22,7 +22,7 @@ bool msga::manager::unhook(hook_t&hook){
         return false;
     }
     io().write(hook.backup);
-    io().free(hook.co_addr);
+    io().free(hook.co_addr,hook.code.size());
     hook.co_addr=0;
     return true;
 }
