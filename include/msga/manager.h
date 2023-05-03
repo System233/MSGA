@@ -27,14 +27,27 @@ namespace msga{
             msga::code backup;
             msga::code code_ptr;
         };
-        std::map<addr_t,std::list<hook_t>>m_map;
+        std::map<addr_t,hook_t>m_map;
         bool dohook(hook_t&hook);
         bool unhook(hook_t&hook);
-        bool rehook(std::list<hook_t>&list,std::list<hook_t>::iterator it,addr_t from,addr_t to);
         public:
         manager(arch::base&arch,io::base&io):m_arch(arch),m_io(io){}
         bool dohook(addr_t from,addr_t to,addr_t origin=0);
         bool unhook(addr_t from,addr_t to);
+
+        template<class T>
+        bool dohook(T*from,T*to,T** origin=nullptr){
+            return dohook(reinterpret_cast<addr_t>(from),
+                        reinterpret_cast<addr_t>(to),
+                        reinterpret_cast<addr_t>(origin));
+        }
+        template<class T>
+        bool unhook(T*from,T*to){
+            return unhook(reinterpret_cast<addr_t>(from),
+                        reinterpret_cast<addr_t>(to));
+        }
+
+
         io::base&io(){return m_io;};
         arch::base&arch(){return m_arch;};
     };

@@ -9,7 +9,7 @@
 #include <stdio.h>
 #define MSGA_ELF_PAGE_SIZE 0x1000
 // #include "elf.h"
-#include "elf_debug.cpp"
+// #include "elf_debug.cpp"
 #include "helper.h"
 #include <cstring>
 using namespace msga;
@@ -87,7 +87,6 @@ bool msga::io::elf_impl<elf_type>::load(std::istream &is)
         m_shstrtab_ref=m_sections[m_ehdr_h.e_shstrndx];
     }
 
-    debug();
     load_relocation_table();
     return true;
 }
@@ -105,6 +104,35 @@ void* msga::io::elf_impl<elf_type>::get(addr_t addr){
         if(section->shdr.sh_type==Elf_SHT::SHT_NOBITS){
             section->shdr.sh_type=Elf_SHT::SHT_PROGBITS;
             section->data.resize(section->shdr.sh_size);
+
+            program_t*p_prog=nullptr;
+            for(auto&prog:m_programs){
+                auto phstart=prog.phdr.p_offset;
+                auto shstart=section->shdr.sh_offset;
+                if(shstart<phstart){
+                    continue;
+                }
+                auto phend=prog.phdr.p_offset+prog.phdr.p_filesz;
+                auto shend=section->shdr.sh_offset+section->shdr.sh_size;
+                if(shend>phend){
+                    continue;
+                }
+                p_prog=&prog;
+                break;
+            }
+            if(!p_prog){
+                program_t prog;
+                prog.phdr.p_type=Elf_PT::PT_LOAD;
+                prog.phdr.p_flags=Elf_PF::PF_R|Elf_PF::PF_W;
+                prog.phdr.p_offset=section->shdr.sh_offset;
+                prog.phdr.p_vaddr=section->shdr.sh_addr;
+                prog.phdr.p_paddr=section->shdr.sh_addr;
+                prog.phdr.p_filesz=section->shdr.sh_size;
+                prog.phdr.p_memsz=section->shdr.sh_size;
+                prog.phdr.p_align=MSGA_ELF_PAGE_SIZE;
+                prog.sections.emplace_back(section);
+                m_programs.emplace_back(std::move(prog));
+            }
         }
         return &section->data[addr-shaddr];
     }
@@ -153,8 +181,6 @@ void msga::io::elf_impl<elf_type>::rebuild_relocation_table(){
         auto&section=section_rel.first;
         if(section->shdr.sh_type==Elf_SHT::SHT_RELA){
             for(auto&item:section_rel.second){
-                std::cout.write("item.first:",sizeof("item.first:"));
-                std::cout<<item.first<<std::endl;
                 typename elf_type::rela_t rel;
                 rel.r_offset=item.first;
                 rel.r_info=item.second.r_info;
@@ -281,6 +307,18 @@ bool msga::io::elf_impl<elf_type>::dump(std::ostream &os){
     offset_t ph_start=congruence_modulo<offset_t>(os.tellp(),ph_addr,MSGA_ELF_PAGE_SIZE);
     os.seekp(ph_start);
     {
+        //https://docs.oracle.com/cd/E19683-01/816-1386/6m7qcoblk/index.html#chapter6-37
+        addr_t min_addr=-1;
+        for(auto&prgo:m_programs){
+            if(prgo.phdr.p_type==Elf_PT::PT_LOAD){
+                min_addr=std::min(min_addr,(addr_t)prgo.phdr.p_vaddr);
+            }
+        }
+        if(min_addr==-1){
+            return false;
+        }
+        min_addr=floor(min_addr,p_align);
+        ph_addr=ph_start+min_addr;
         typename elf_type::phdr_t phdr;
         phdr.p_type=Elf_PT::PT_PHDR;
         phdr.p_flags=Elf_PF::PF_R;
@@ -344,7 +382,6 @@ bool msga::io::elf_impl<elf_type>::dump(std::ostream &os){
     os.seekp(std::ios::beg);
     os<<m_ident;
     os<<m_ehdr_h;
-    debug();
     return true;
 }
 
@@ -521,7 +558,6 @@ void msga::io::elf_impl<elf_type>::free(addr_t addr,size_t len){
 //TODO: RELA
 template<class elf_type>
 void msga::io::elf_impl<elf_type>::rebase(addr_t addr, rel_base_t*opt){
-    std::cout<<std::hex<<addr<<std::endl;
     auto type=0;
     addr=addr+opt->offset();
     relx_t data;
@@ -542,7 +578,7 @@ void msga::io::elf_impl<elf_type>::rebase(addr_t addr, rel_base_t*opt){
         }else{
             switch (opt->type())
             {
-            case e_rel::e_rela:type=Elf_R_386::R_386_GLOB_DAT; break;
+            case e_rel::e_rela:type=Elf_R_386::R_386_RELATIVE; break;
             case e_rel::e_rel16:type=Elf_R_386::R_386_16; break;
             case e_rel::e_rel32:type=Elf_R_386::R_386_32; break;
             default:

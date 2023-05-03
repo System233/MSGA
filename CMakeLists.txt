@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.1)
 project(msga C CXX)
 
 set(CMAKE_SYSTEM_NAME Windows)
@@ -16,6 +16,7 @@ set(MSGA_SRC
     src/arch/ihde.cpp
     src/arch/ihde32.cpp
     src/arch/ihde64.cpp
+    src/io/helper.cpp
     src/io/elf.cpp
     src/io/elf_debug.cpp
     src/io/pe.cpp
@@ -32,34 +33,6 @@ target_link_libraries(msga_static hde)
 
 include_directories(include)
 
-include_directories(include)
-add_executable(msga_hde tests/test_hde.c)
-target_link_libraries(msga_hde hde)
+enable_testing()
+add_subdirectory(tests)
 
-add_executable(msga_io_elf tests/test_io_elf.cpp)
-target_link_libraries(msga_io_elf msga_static)
-
-add_executable(msga_io_pe tests/test_io_pe.cpp)
-target_link_libraries(msga_io_pe msga_static)
-
-if(UNIX)
-set(TEST_LIB dl)
-endif()
-add_executable(msga_drone tests/drone.cpp)
-target_link_libraries(msga_drone msga_static ${TEST_LIB})
-# set_property(TARGET msga_drone PROPERTY POSITION_INDEPENDENT_CODE ON)
-
-
-add_library(msga_dronex SHARED tests/drone.cpp)
-target_link_libraries(msga_dronex msga_static ${TEST_LIB})
-# set_property(TARGET msga_dronex PROPERTY POSITION_INDEPENDENT_CODE ON)
-add_executable(msga_loader tests/loader.cpp)
-target_link_libraries(msga_loader msga_static ${TEST_LIB})
-# set_property(TARGET msga_loader PROPERTY POSITION_INDEPENDENT_CODE ON)
-# target_link_libraries(msga_test_pe/)
-
-
-# if(WIN32)
-    add_executable(msga_io tests/test_io.cpp)
-    target_link_libraries(msga_io msga_static)
-# endif()

@@ -10,11 +10,14 @@ bool msga::manager::dohook(hook_t&hook){
         return false;
     }
     hook.code.setbase(hook.co_addr);
-    hook.code_ptr.setbase(-hook.co_addr);
-    hook.code_ptr.moveto(hook.origin_addr);
     io().write(hook.code);
     io().write(hook.origin);
-    io().write(hook.code_ptr);
+    
+    if(hook.origin_addr){
+        hook.code_ptr.setbase(-hook.co_addr);
+        hook.code_ptr.moveto(hook.origin_addr);
+        io().write(hook.code_ptr);
+    }
     return true;
 }
 bool msga::manager::unhook(hook_t&hook){
@@ -33,48 +36,26 @@ bool msga::manager::dohook(addr_t from,addr_t to, addr_t origin)
         return false;
     }
     auto&list=m_map[from];
-    auto it=std::find_if(list.begin(),list.end(),[to](auto&item){return item.to_addr==to;});
-    if(it!=list.end()){
-        return false;
-    }
     hook_t data;
     data.from_addr=from;
     data.to_addr=to;
     data.origin_addr=origin;
     if(dohook(data)){
-        list.emplace_front(std::move(data));
+        m_map[from]=std::move(data);
     }
     return true;
 }
 
-bool msga::manager::rehook(std::list<hook_t>&list,std::list<hook_t>::iterator it,addr_t from,addr_t to){
-    if(it==list.end()){
-        return false;
-    }
-    auto&hook=*it;
-    if(!unhook(hook)){
-        return false;
-    }
-    if(it->to_addr==to){
-        list.erase(it);
-        return true;
-    }
-    if(rehook(list,++it,from,to)){
-        return dohook(hook);
-    }
-    return false;
-
-}
 bool msga::manager::unhook(addr_t from,addr_t to)
 {
     auto it=m_map.find(from);
     if(it==m_map.end()){
         return false;
     }
-    auto&list=m_map[from];
-    auto end=std::find_if(list.begin(),list.end(),[to](auto&item){return item.to_addr==to;});
-    if(end==list.end()){
-        return false;
+    auto&data=it->second;
+    if(unhook(data)){
+        m_map.erase(it);
+        return true;
     }
-    return rehook(list,list.begin(),from,to);
+    return false;
 }
